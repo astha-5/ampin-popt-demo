@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMPIN — P-OPT Software (Demo)</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root{
+  --bg:#0a0d12; --card:#12171f; --head:#0b0f15; --bdr:#232b36;
+  --txt:#d7e0e8; --txtL:#8d9bab;
+  --teal:#00c2b2; --amber:#f0a500;
+  --font-ui:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --font-num:'JetBrains Mono','Cascadia Mono','SF Mono',Consolas,ui-monospace,monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; min-height:100vh; background:var(--bg); color:var(--txt);
+  font-family:var(--font-ui); -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column;
+}
+header{
+  background:var(--head); border-bottom:1px solid var(--bdr);
+  padding:22px 32px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.mark{
+  font-family:var(--font-num); font-size:13px; letter-spacing:.14em;
+  color:var(--teal); border:1px solid var(--teal); border-radius:4px;
+  padding:4px 9px; text-transform:uppercase;
+}
+header h1{font-size:16px; font-weight:600; margin:0; letter-spacing:.01em;}
+header .sub{font-size:12px; color:var(--txtL); margin-left:auto; font-family:var(--font-num);}
+main{flex:1; max-width:1000px; width:100%; margin:0 auto; padding:44px 32px 60px;}
+.lede{font-size:14px; color:var(--txtL); line-height:1.65; max-width:620px; margin:0 0 34px;}
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px;}
+.mod{
+  display:block; text-decoration:none; color:inherit;
+  background:var(--card); border:1px solid var(--bdr); border-radius:10px;
+  padding:26px 26px 24px; transition:border-color .15s, transform .15s;
+}
+.mod:hover{transform:translateY(-2px);}
+.mod.teal:hover{border-color:var(--teal);}
+.mod.amber:hover{border-color:var(--amber);}
+.tag{
+  font-family:var(--font-num); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; display:inline-block; margin-bottom:14px;
+  padding:3px 8px; border-radius:3px;
+}
+.teal .tag{color:var(--teal); background:rgba(0,194,178,.1);}
+.amber .tag{color:var(--amber); background:rgba(240,165,0,.1);}
+.mod h2{font-size:19px; margin:0 0 10px; font-weight:600;}
+.mod p{font-size:13.5px; color:var(--txtL); line-height:1.6; margin:0 0 18px;}
+.open{font-family:var(--font-num); font-size:12px; letter-spacing:.06em;}
+.teal .open{color:var(--teal);}
+.amber .open{color:var(--amber);}
+footer{
+  border-top:1px solid var(--bdr); padding:18px 32px;
+  font-size:11.5px; color:var(--txtL); font-family:var(--font-num);
+  display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+@media(max-width:640px){
+  header,main,footer{padding-left:20px; padding-right:20px;}
+  header .sub{margin-left:0; width:100%;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mark">P-OPT</span>
+  <h1>AMPIN Energy Transition — Demo Environment</h1>
+  <span class="sub">Demo build · illustrative data</span>
+</header>
+
+<main>
+  <p class="lede">
+    Two modules are available in this demo. Both run entirely in the browser with
+    representative sample data — nothing is connected to live systems, and no data
+    entered here is stored or transmitted.
+  </p>
+
+  <div class="grid">
+    <a class="mod teal" href="plant-portal.html">
+      <span class="tag">Module 01</span>
+      <h2>Plant Portal</h2>
+      <p>
+        Plant-side workspace — day-ahead forecast submission, intraday revisions,
+        availability, outage and curtailment declarations, and meter readings.
+      </p>
+      <span class="open">Open module →</span>
+    </a>
+
+    <a class="mod amber" href="tradeops.html">
+      <span class="tag">Module 02</span>
+      <h2>TradeOps</h2>
+      <p>
+        Desk-side workspace — registry and masters, bid desk automation, RTM session
+        board, scheduling, settlement and portfolio analytics.
+      </p>
+      <span class="open">Open module →</span>
+    </a>
+  </div>
+</main>
+
+<footer>
+  <span>EMA Solutions Pvt. Ltd. · P-OPT</span>
+  <span>Internal demo — not for distribution</span>
+</footer>
+
+</body>
+</html>
