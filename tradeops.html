@@ -422,6 +422,30 @@ body.light .fg i.r10{background:#7a1613;}
 .fg-pin .ph2{color:var(--chg);font-weight:600;}
 .fg-empty{padding:26px;text-align:center;color:var(--txtL);font-size:12px;}
 
+/* ─── EXCHANGE SUBMISSION ─── */
+.xc-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:7px 18px;}
+.xc-kv{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;
+  padding:3px 0;border-bottom:1px solid var(--bdr);align-items:baseline;}
+.xc-kv .xk{color:var(--txtL);white-space:nowrap;}
+.xc-kv .xv{color:var(--txt);text-align:right;font-family:var(--font-num);
+  overflow-wrap:anywhere;}
+.xc-key{font-size:10.5px;}
+.xc-err,.xc-warn,.xc-ok{font-size:11.5px;line-height:1.6;border-radius:4px;
+  padding:8px 11px;border:1px solid var(--bdr);}
+.xc-err{background:rgba(239,83,80,.08);border-color:rgba(239,83,80,.42);color:var(--badT);}
+.xc-warn{background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.40);
+  color:var(--wrnT);margin-top:7px;}
+.xc-ok{background:rgba(38,166,154,.07);border-color:rgba(38,166,154,.36);color:var(--okT);}
+.xc-err ul,.xc-warn ul{margin:4px 0 0 16px;}
+.xc-err b,.xc-warn b,.xc-ok{font-weight:600;}
+.xc-raw{font-family:var(--font-num);font-size:10.5px;line-height:1.75;
+  overflow-x:auto;white-space:nowrap;color:var(--txt);}
+.xc-raw .rn{display:inline-block;width:20px;color:var(--txtL);text-align:right;
+  margin-right:8px;}
+.xc-raw .rc{display:inline-block;width:64px;color:var(--chg);}
+.btn:disabled{opacity:.42;cursor:not-allowed;}
+.btn:disabled:hover{border-color:var(--bdr);color:var(--txt);}
+
 /* hover tooltip. pointer-events:none matters — a tooltip that can sit under the
    cursor steals the mousemove that is meant to move it, and the thing flickers. */
 .fg-tip{position:fixed;z-index:300;pointer-events:none;opacity:0;
@@ -686,8 +710,68 @@ body.light .fg-tip{box-shadow:0 6px 20px rgba(31,45,61,.19);}
       <div class="card-b tight"><div class="tw" id="apprTbl"></div></div>
     </div>
     <div class="card"><div class="card-h"><h3>Exchange file preview</h3>
-      <div class="hint">IEX SB format</div></div>
+      <div class="hint">validated payload</div></div>
       <div class="card-b tight"><div class="tw sh" id="filePrev"></div></div></div>
+  </div>
+
+  <!-- ── M1b · exchange submission ── -->
+  <div class="spane" id="sub-bid-xchg">
+    <div class="ph" style="border:0;padding:0;margin-bottom:11px">
+      <div class="ph-r">
+        <div class="fld w1"><label>Exchange</label>
+          <select id="xcEx" onchange="xchSegs();xchRender()"></select></div>
+        <div class="fld w1"><label>Segment</label>
+          <select id="xcSeg" onchange="xchRender()"></select></div>
+        <div class="fld w1"><label>Layout</label>
+          <select id="xcKind" onchange="xchRender()"></select></div>
+        <div class="fld w1"><label>Ask disc %</label>
+          <input id="xcDisc" value="-2" oninput="xchRender()"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:11px">
+      <div class="card-h"><h3>Order Carry Forward</h3>
+        <div class="hint">GDAM &rarr; DAM &rarr; HPDAM, one way</div></div>
+      <div class="card-b" style="display:flex;gap:11px;align-items:baseline;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="xcOcf" onchange="xchRender()"> Carry unmatched volume forward
+        </label>
+        <span class="note" id="xcOcfNote"></span>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-bottom:11px">
+      <div class="card"><div class="card-h"><h3>Exchange connection</h3>
+        <div class="hint">member, transport, layout</div></div>
+        <div class="card-b" id="xcMeta"></div></div>
+      <div class="card"><div class="card-h"><h3>Payload identity</h3>
+        <div class="hint">one payload, two transports</div></div>
+        <div class="card-b" id="xcId"></div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:11px">
+      <div class="card-h"><h3>Pre-submission validation</h3>
+        <div class="hint">blocks both paths on error</div></div>
+      <div class="card-b" id="xcVal"></div>
+      <div class="card-b" style="border-top:1px solid var(--bdr);display:flex;
+        gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn" onclick="xchApprove()">Release as checker</button>
+        <button class="btn" id="xcDl" onclick="xchDownload()">Download bid file</button>
+        <button class="btn pri" id="xcSend" onclick="xchSubmit()">Submit to exchange</button>
+        <span class="note" id="xcNote"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:11px">
+      <div class="card-h"><h3>File preview &mdash; <span class="mono" id="xcFile">—</span></h3>
+        <div class="hint">exactly the columns that will be written</div></div>
+      <div class="card-b" id="xcRaw"></div>
+      <div class="card-b tight" style="border-top:1px solid var(--bdr)">
+        <div class="tw sh" id="xcPrev"></div></div></div>
+
+    <div class="card"><div class="card-h"><h3>Submission log</h3>
+      <div class="hint">every attempt, with its payload hash</div></div>
+      <div class="card-b tight"><div class="tw sh" id="xcLog"></div></div></div>
   </div>
 </div>
 
@@ -1164,7 +1248,7 @@ function buildAssets(){
     a.hpdam= false;                                    // RE seller — ineligible
     a.rec  = (a.offtake==='Merchant'||a.offtake==='OpenAccess');
     a.exch = a.ac>=60?['IEX','PXIL','HPX']:a.ac>=25?['IEX','PXIL']:['IEX'];
-    a.pf   = 'AMP'+String(1000+A.indexOf(a)).slice(1);
+    a.pf   = 'AMP'+String(1001+A.indexOf(a)).slice(1);   // 1-based: AMP001, not AMP000
     a.cuf  = a.tech==='Wind'?0.29:a.tech==='Hybrid'?0.33:a.tech==='Floating'?0.21:0.215;
     a.cod  = 2019+Math.floor(R.gen()*7);
   });
@@ -1211,6 +1295,235 @@ AS.forEach(a=>{
 });
 /* CR for one plant in one block. PPA plants ignore the block entirely. */
 const crOf=(a,b)=> a.cr===CR_MARKET ? clamp(0,SEG.DAM.cap,fin(P.ACP[b],0)) : a.cr;
+
+/* ═══ 2b · EXCHANGE & BID-FILE FORMAT REGISTRY ═══════════════════════════
+   Built against the actual templates AMPIN supplied, not from a guess. The
+   two exchanges submit in fundamentally different shapes and an emitter that
+   treats them as variations of one CSV would be wrong for both:
+
+   IEX  — a PRICE-STEP MATRIX. Three preamble lines, then 96 rows, one per
+          block, each carrying a quantity at EVERY price point on a shared
+          price axis. 190–198 columns wide in the supplied files.
+   PXIL — one ROW PER BID, sparse: only the blocks actually bid appear, each
+          with its own from/to date-hour-minute, a single price and quantity.
+
+   SIGN IS THE CONVENTION THAT MATTERS MOST, and both exchanges agree on it:
+   a SELL is written as a NEGATIVE quantity, a BUY as positive. Getting this
+   backwards submits the opposite side of the market — the single most
+   expensive formatting error available here — so the emitters take a signed
+   quantity and the validator checks the sign against the declared side.
+
+   Confirmed against the supplied templates:
+     Oyster_RTM_Sale_SB_20260909.csv        (IEX SB, sale,     194 price pts)
+     Oyster_DAM_Purchase_SB_20260909.csv    (IEX SB, purchase, 190 price pts)
+     PXIL_Dam_Single_Bid_01012026.csv       (PXIL single bid,  11 columns)
+   HPX has no template yet and stays explicitly unconfirmed.                */
+
+const XCH = {
+  IEX: { name:'Indian Energy Exchange', member:'AMPIN/IEX/M-04173',
+         participant:'AMPINRE01', portfolio:'AMPIN-RE-SELL', area:'INDIA',
+         segs:['DAM','GDAM','RTM','TAM','GTAM'], emit:'iex-sb',
+         api:{ mode:'REST/JSON', auth:'mTLS client cert + HMAC-SHA256 request signing',
+               base:'https://api.iexindia.com/v2', submit:'/bids', ack:'/bids/{id}/status',
+               idem:'X-Idempotency-Key', live:true } },
+  PXIL:{ name:'Power Exchange India', member:'APTS10390001',
+         participant:'APTS10390001', portfolio:'APTS10390001', area:'INDIA',
+         segs:['DAM','GDAM','RTM','TAM'], emit:'pxil-row',
+         api:{ mode:'SFTP drop + polled ack', auth:'SSH key + PGP payload',
+               base:'sftp://sftp.pxil.in/in', submit:'/bids/{date}', ack:'/ack/{date}',
+               idem:'filename sequence', live:true } },
+  HPX: { name:'Hindustan Power Exchange', member:'HPX-AMPIN-0864',
+         participant:'HPX-AMPIN-0864', portfolio:'AMPIN-RE', area:'INDIA',
+         segs:['DAM','GDAM','RTM'], emit:'pxil-row',      // provisional shape
+         api:{ mode:'REST/JSON', auth:'OAuth2 client credentials + IP allow-list',
+               base:'https://api.hpx.co.in/v1', submit:'/order/bulk', ack:'/order/{id}',
+               idem:'clientOrderId', live:false } }
+};
+
+/* ── OCF · Order Carry Forward ────────────────────────────────────────────
+   From `bidiq`, and it is easy to get wrong in three separate ways:
+     · the cascade is SEQUENTIAL and ONE-DIRECTIONAL — GDAM → DAM → HPDAM;
+     · there is NO DAM → RTM carry-forward, and inventing one is a named trap;
+     · an RE seller is INELIGIBLE for HPDAM, so for this portfolio the chain
+       terminates at DAM. AMPIN's usable OCF is exactly one hop: GDAM → DAM.
+   Returning the reason, not just null, is the point — a control that greys out
+   without saying why reads as a bug. */
+const OCF_NEXT = {GDAM:'DAM', DAM:'HPDAM'};
+function ocfTarget(seg,asset){
+  const nxt=OCF_NEXT[seg];
+  if(!nxt) return {ok:false, reason:seg+' has no carry-forward — the cascade runs GDAM → DAM → HPDAM only'};
+  if(SEG[nxt] && SEG[nxt].re===false && asset)
+    return {ok:false, target:nxt,
+            reason:'carry-forward from '+seg+' would land in '+nxt+
+                   ', and an RE seller is not eligible there'};
+  return {ok:true, target:nxt, reason:'unmatched volume carries '+seg+' → '+nxt};
+}
+
+/* Per-block flag written in IEX column 3. Both supplied templates carry "Y" in
+   every row — including the RTM file, where OCF cannot apply at all. So this
+   column is NOT simply the OCF switch, whatever it looks like, and the demo
+   does not pretend otherwise: the flag is emitted as configured and its
+   meaning is marked for confirmation with IEX. OCF itself is carried as a
+   first-class bid property and in the API body, not silently written here. */
+const IEX_ROWFLAG = {value:'Y', meaning:'per-block flag, purpose to confirm with IEX',
+                     confirmed:false};
+
+const XFMT = {
+  /* Line endings are CRLF in BOTH supplied templates, and they differ on the
+     trailing newline: the IEX matrix ends flush after the last quantity, the
+     PXIL row file ends with one. Verified on the raw bytes — reading a template
+     in text mode silently rewrites CRLF to LF and will tell you the opposite. */
+  IEX:{ sb:{ id:'IEX-SB', label:'Stepped bid — price-step matrix', ext:'csv',
+        file:'{PORT}_{SEG}_{SIDE}_SB_{DATE}_1.csv', eol:'\r\n', trailingNewline:false,
+        confirmed:true, source:'Oyster_RTM_Sale_SB / Oyster_DAM_Purchase_SB templates',
+        note:'96 rows always; quantity at every price point; sell negative' } },
+  PXIL:{ single:{ id:'PXIL-SBF', label:'Single bid file', ext:'csv',
+        file:'PXIL_{SEG}_Single_Bid_{DATE}_1.csv', eol:'\r\n', trailingNewline:true,
+        confirmed:true, source:'PXIL_Dam_Single_Bid_01012026 template',
+        note:'sparse — only blocks actually bid; hour 24 closes the last block' } },
+  HPX:{ single:{ id:'HPX-PROV', label:'Provisional — PXIL-shaped', ext:'csv',
+        file:'HPX_{SEG}_Bid_{DATE}_1.csv', eol:'\r\n', trailingNewline:true,
+        confirmed:false, source:'NO TEMPLATE SUPPLIED',
+        note:'shape borrowed from PXIL pending the HPX member-portal spec' } }
+};
+const xchKinds = ex => Object.keys(XFMT[ex]||{});
+const xchSpec  = (ex,kind) => (XFMT[ex]&&XFMT[ex][kind]) || null;
+
+/* Bid parameters, named as `popt-bidding` names them. */
+const BIDP = { sco:0.50, bco:0.50, pstep:50, minPrice:0 };
+
+/* ── validation ───────────────────────────────────────────────────────────
+   Guards BOTH transports, so a file and an API call can never disagree about
+   whether a bid was legal. */
+function validateBid(ex,seg,kind,rows,asset,opt){
+  opt=opt||{};
+  const errs=[], warns=[], spec=xchSpec(ex,kind);
+  if(!XCH[ex])  errs.push('Unknown exchange "'+ex+'".');
+  if(!spec)     errs.push('No '+kind+' layout for '+ex+'.');
+  if(XCH[ex]&&!XCH[ex].segs.includes(seg))
+    errs.push(seg+' is not offered by '+ex+' — member is enabled for '+XCH[ex].segs.join(', ')+'.');
+  if(!SEG[seg]) errs.push('Unknown segment "'+seg+'".');
+  if(SEG[seg]&&SEG[seg].re===false&&asset)
+    errs.push(asset.id+' is an RE seller — not eligible for '+seg+' (validated at asset load).');
+  if(!rows.length) errs.push('Nothing to bid — every block is below the '+BIDP.sco+' MW cutoff.');
+  const cap=SEG[seg]?SEG[seg].cap:0;
+  rows.forEach(r=>{
+    const tag='Block '+(r.b+1);
+    if(!Number.isFinite(r.price)||!Number.isFinite(r.qty))
+      errs.push(tag+': price or quantity is not a number.');
+    else{
+      if(r.price>cap)   errs.push(tag+': ₹'+inr(r.price,0)+' exceeds the '+seg+' cap of ₹'+inr(cap,0)+'.');
+      if(r.price<BIDP.minPrice) errs.push(tag+': negative price.');
+      if(Math.abs(r.qty)<=0) errs.push(tag+': zero quantity.');
+      /* SIGN. Both exchanges write a sell as negative; a positive quantity on a
+         SELL row is an order on the wrong side of the market. */
+      if(r.side==='SELL' && r.qty>0) errs.push(tag+': SELL must be a negative quantity.');
+      if(r.side==='BUY'  && r.qty<0) errs.push(tag+': BUY must be a positive quantity.');
+      if(Math.round(r.price)!==r.price) warns.push(tag+': price rounded to the whole rupee on emit.');
+    }
+  });
+  if(opt.gateMin!=null && opt.gateMin<=0)
+    errs.push('Gate for this segment has closed — the submission window is shut.');
+  if(opt.ocf){
+    const t=ocfTarget(seg,asset);
+    if(!t.ok) errs.push('Order Carry Forward is not available: '+t.reason+'.');
+  }
+  if(spec&&!spec.confirmed)
+    warns.push('Layout '+spec.id+' is UNCONFIRMED ('+spec.source+') — confirm against '+
+      ex+"'s published spec before a real bid.");
+  if(ex==='IEX'&&!IEX_ROWFLAG.confirmed)
+    warns.push('IEX column 3 is emitted as "'+IEX_ROWFLAG.value+
+      '" per the templates; its meaning is unconfirmed and it is not assumed to be the OCF switch.');
+  if(XCH[ex]&&!XCH[ex].api.live)
+    warns.push(ex+' API onboarding is not complete — file download is the only path today.');
+  return {ok:!errs.length, errs, warns, spec};
+}
+
+/* ── price axis for the IEX matrix ────────────────────────────────────────
+   Every block's quantity is written at every price point, so the axis is the
+   union of the portfolio's own step prices, bracketed by 0 and the segment cap.
+   The bracket pair differs by side, and this is visible in both templates:
+     SELL becomes active AT t   → the axis carries (t, t+1)
+     BUY  becomes inactive AT t → the axis carries (t-1, t)
+   The supplied files also carry ~150 further points that no step of theirs
+   uses; extra points are harmless because each simply repeats its neighbour's
+   value, so this emits the MINIMAL equivalent axis rather than reproducing
+   points whose origin is not evident from the template. */
+function iexPriceAxis(rows,cap){
+  const set=new Set([0,cap]);
+  rows.forEach(r=>{ const t=Math.round(r.price);
+    if(r.side==='SELL'){ set.add(t); set.add(Math.min(cap,t+1)); }
+    else               { set.add(Math.max(0,t-1)); set.add(t); }});
+  return [...set].sort((a,b)=>a-b);
+}
+/* quantity this block offers at price p — the step function itself */
+function iexQtyAt(r,p){
+  if(!r) return 0;
+  const t=Math.round(r.price);
+  return r.side==='SELL' ? (p>=t ? r.qty : 0)      // sell at or above reserve
+                         : (p<=t ? r.qty : 0);     // buy at or below ceiling
+}
+
+function emitIexSb(ex,seg,rows,ctx){
+  const X=XCH[ex], cap=SEG[seg].cap;
+  const axis=iexPriceAxis(rows,cap);
+  const byB={}; rows.forEach(r=>byB[r.b]=r);
+  const L=[];
+  L.push([X.member,X.participant,X.portfolio,X.area].join(','));
+  L.push(ctx.bidName);
+  L.push(',,,,'+axis.join(','));
+  for(let b=0;b<NB;b++){
+    const r=byB[b];
+    L.push([blkTime(b), b+1===NB?'00:00':blkTime(b+1), IEX_ROWFLAG.value, 0]
+      .concat(axis.map(p=>Math.round(iexQtyAt(r,p)))).join(','));
+  }
+  return L;
+}
+
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pxilDate=iso=>{const [y,m,d]=iso.split('-');return d+'-'+MON[+m-1]+'-'+y;};
+const pad2=n=>String(n).padStart(2,'0');
+
+function emitPxilRow(ex,seg,rows,ctx){
+  const X=XCH[ex], d=pxilDate(ctx.date), L=[];
+  L.push('Client Id,DT From Date,DT From Hour,DT From Min,DT To Date,DT To Hour,'+
+         'DT To Min,Type,Price(INR/MWhr),Power(MW),Side(B/S)');
+  rows.forEach(r=>{
+    const m0=r.b*15, m1=m0+15;
+    /* the last block closes at HOUR 24 on the SAME date — PXIL does not roll to
+       00:00 of the next day the way the IEX matrix does. Emitting 00:00 here
+       would move the block a day and the file would be rejected or, worse,
+       accepted against the wrong day. */
+    L.push([X.member, d, pad2(Math.floor(m0/60)), pad2(m0%60),
+            d, pad2(Math.floor(m1/60)), pad2(m1%60),
+            'N', Math.round(r.price), Math.round(r.qty),
+            r.side==='SELL'?'S':'B'].join(','));
+  });
+  return L;
+}
+
+function bidCsv(ex,seg,kind,rows,ctx){
+  const spec=xchSpec(ex,kind); if(!spec) return null;
+  const side = rows.length && rows[0].side==='BUY' ? 'Purchase' : 'Sale';
+  const c2 = Object.assign({bidName:'Renewable '+side}, ctx);
+  const lines = XCH[ex].emit==='iex-sb' ? emitIexSb(ex,seg,rows,c2)
+                                        : emitPxilRow(ex,seg,rows,c2);
+  const text = lines.join(spec.eol) + (spec.trailingNewline?spec.eol:'');
+  const name = spec.file.replace('{SEG}',seg).replace('{SIDE}',side)
+    .replace('{PORT}',(ctx.portLabel||'Oyster'))
+    .replace('{DATE}',ctx.date.replace(/-/g,''));
+  return {name, text, rows:rows.length, spec, axis:XCH[ex].emit==='iex-sb'
+    ? iexPriceAxis(rows,SEG[seg].cap).length : null};
+}
+
+/* Deterministic payload hash. What matters at 09:58 is not a pretty digest but
+   being able to prove the file on disk is byte-identical to what the API was
+   handed — one payload, two transports, one hash. FNV-1a is enough for that. */
+function payloadHash(s){
+  let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; }
+  return ('00000000'+h.toString(16)).slice(-8).toUpperCase();
+}
 
 /* ═══ 3 · GENERATION / ACTUALS PLANE ═════════════════════════════════════ */
 /* ONE shared actuals layer. Five screens read from it, so no two screens
@@ -1977,7 +2290,8 @@ const NAVDEF=[
 const SUBS={
  reg:[['plants','Plant register'],['clients','Client & contracts'],['charge','Charge & segment master']],
  bid:[['grid','96-block bid grid'],['sess','RTM session board'],['ledger','Bid ledger'],
-      ['triage','Failure triage'],['appr','Approval & file']],
+      ['triage','Failure triage'],['appr','Approval & file'],
+      ['xchg','Exchange submission']],
  sched:[['obl','Obligation & deviation'],['plants','Plant submissions'],['events','Event log & work list'],['submit','SLDC submission']],
  rea:[['cockpit','Match cockpit'],['exc','Exception queue'],['fetch','Fetch health & revisions']],
  bill:[['run','Billing run'],['inv','Invoices'],['cn','Credit notes & disputes']],
@@ -2016,7 +2330,8 @@ function goSub(p,s){CURSUB[p]=s;
   SUBS[p].forEach(x=>{const e=$('sub-'+p+'-'+x[0]); if(e)e.classList.toggle('on',x[0]===s);});
   buildTabs();
   ({reg:renderReg,bid:renderBid,sched:renderSched,rea:renderRea,bill:renderBill,
-    anl:renderAnl,x:renderX}[p]||(()=>{}))();}
+    anl:renderAnl,x:renderX}[p]||(()=>{}))();
+  if(p==='bid'&&s==='xchg') xchRender();}
 
 function toast(m,err){const t=$('toast');t.textContent=m;t.className='toast on'+(err?' err':'');
   clearTimeout(t._h);t._h=setTimeout(()=>t.className='toast',3400);}
@@ -2105,8 +2420,11 @@ function renderOps(){
       earns nothing. On this book the two differ by more than half. Cash net
       stays in the sub-line for settlement. */
    ['Deviation cost', rsL(dsmCost,2),
-    rsL(dsmPayable,2)+' charged · '+rsL(dsmForegone,2)+' foregone · '+
-    pc(dsmCost/Math.max(1,rev)*100,1)+' of revenue','red'],
+    /* the split explains the headline, which is what a KPI sub-line is for.
+       Adding "% of revenue" here wrapped the caption onto a second line, and a
+       wrapped caption is a caption that became a sentence — the percentage
+       lives on the M2 DSM card instead. */
+    rsL(dsmPayable,2)+' charged · '+rsL(dsmForegone,2)+' foregone','red'],
    ['Open work', trSave.length+' bid · '+openExc.length+' recon',
     rsL(trSave.reduce((s,t)=>s+t.exposure,0),1)+' saveable','red']]);
 
@@ -2538,7 +2856,8 @@ function rejectBid(id){const l=LEDGER.find(x=>x.id===id);if(!l)return;l.st='CANC
   toast(id+' rejected — reason captured in the audit log.');renderBid();}
 function submitBids(){const r=bidRows().filter(x=>x.mw>0.01);
   toast(r.length+' bids queued. Inside envelope auto-dispatches; the rest page a checker.');}
-function emitBidFile(){goSub('bid','appr');toast('Exchange file preview — validated against the IEX SB spec.');}
+function emitBidFile(){goSub('bid','xchg');
+  toast('Exchange submission — pick an exchange, validate, then download or send.');}
 </script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3226,6 +3545,333 @@ function fgShowPin(id,b){
 
 /* the grid is width-fitted, so a resize has to re-fit it */
 window.addEventListener('resize',()=>{ if(CUR==='fleet') fgRender(); });
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   M1b · EXCHANGE SUBMISSION — file out, or API in
+
+   Two transports, ONE validated payload. The CSV a member uploads by hand and
+   the JSON body an API takes are built from the same rows, validated by the
+   same function and hashed to the same digest. The moment those two paths can
+   diverge, a desk can download a corrected file, submit the stale one through
+   the API, and reconcile the difference a month later on a settlement
+   statement.
+
+   The state machine is deliberately explicit, because the failure that costs
+   real money in exchange submission is not a rejected bid — a rejection is
+   loud and fixable inside the gate. It is the SAME BID SENT TWICE. So:
+
+     · every submission carries an idempotency key derived from the payload
+       hash plus (exchange, segment, portfolio, delivery date, revision);
+     · re-submitting a key that has already been accepted returns the original
+       acknowledgement and sends nothing;
+     · a failure is never retried automatically — it needs a human action,
+       because an automatic retry against a request that actually succeeded but
+       timed out on the way back is exactly how a bid gets doubled.
+
+   Maker-checker is enforced on identity, not on a checkbox: the account that
+   built the payload cannot be the account that releases it.
+
+   ⚠ In this demo the transport is SIMULATED. Nothing leaves the browser. The
+   simulation includes a deliberate rejection path, because a demo where every
+   submission succeeds teaches an operator nothing about the day one does not.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const XST = {DRAFT:'DRAFT', VALID:'VALIDATED', PEND:'AWAITING_CHECKER',
+             APPR:'APPROVED', SENDING:'SUBMITTING', ACK:'ACCEPTED',
+             NACK:'REJECTED', DUP:'DUPLICATE_SUPPRESSED'};
+const XST_PILL = {DRAFT:'p-mut', VALIDATED:'p-inf', AWAITING_CHECKER:'p-wrn',
+  APPROVED:'p-vio', SUBMITTING:'p-inf', ACCEPTED:'p-ok', REJECTED:'p-bad',
+  DUPLICATE_SUPPRESSED:'p-wrn'};
+
+/* session identities — in production these come from the signed-in user, and
+   the checker rule is enforced server-side on the token, not here. */
+const XME = {maker:'r.iyer@ampin.energy', checker:'s.sarkar@ampin.energy'};
+
+let XSUBS = [];          // submission attempts, newest first
+let XKEYS = {};          // idempotency key → the accepted submission
+let XDRAFT = null;       // the payload currently staged
+
+function xchInit(){
+  const e=$('xcEx'); if(e&&!e.options.length)
+    Object.keys(XCH).forEach(k=>e.add(new Option(k+' · '+XCH[k].name,k)));
+  xchKindOpts();
+  xchSegs();
+}
+/* The bid layouts an exchange actually has — IEX submits a stepped matrix,
+   PXIL a single-bid row file. Offering "block bid" for an exchange whose
+   template has no such thing was an invention; the registry decides now. */
+function xchKindOpts(){
+  const ex=$('xcEx').value, k=$('xcKind'); if(!k) return;
+  const cur=k.value; k.innerHTML='';
+  xchKinds(ex).forEach(v=>k.add(new Option((XFMT[ex][v]||{}).label||v,v)));
+  if([...k.options].some(o=>o.value===cur)) k.value=cur;
+}
+/* segment list follows the exchange — a member enabled for four segments on one
+   exchange and three on another should never be offered the fourth. */
+function xchSegs(){
+  xchKindOpts();
+  const ex=$('xcEx').value, s=$('xcSeg'); if(!s) return;
+  /* Seed from the bid desk's own segment the first time, so the two selectors
+     on this pane do not open showing different segments — one screen quoting
+     GDAM in its header and DAM in its file preview is a reading a client will
+     not resolve in our favour. After that the operator's choice stands, and it
+     survives an exchange change whenever the new exchange offers it. */
+  const cur = s.value || ($('bidSeg') && $('bidSeg').value) || '';
+  s.innerHTML='';
+  (XCH[ex]?XCH[ex].segs:[]).forEach(g=>s.add(new Option(g,g)));
+  if([...s.options].some(o=>o.value===cur)) s.value=cur;
+}
+
+/* ── the rows, from the same position every other screen reads ────────────
+   Canonical shape: one entry per block, {b, price, qty, side}, with the
+   quantity ALREADY SIGNED to the exchange convention (sell negative). Signing
+   once, here, is what stops two emitters disagreeing about the side. */
+function xchRows(){
+  const a=curAsset(), seg=$('xcSeg').value, o=ACT[a.id], out=[];
+  const disc=fin($('xcDisc')?.value,0)/100;      // ask discount vs reference
+  for(let b=0;b<NB;b++){
+    const sur=Math.max(0,fin(o.metered[b],0)-fin(o.captive[b],0));
+    const mw = b<LB ? sur : Math.max(0,fin(o.avail[b],0)-fin(o.captive[b],0));
+    if(mw<BIDP.sco) continue;                    // sell cutoff
+    const ref=fin(P[seg]?P[seg][b]:P.DAM[b],0);
+    const px=clamp(0,SEG[seg].cap,Math.round(ref*(1+disc)/BIDP.pstep)*BIDP.pstep);
+    out.push({b, price:px, qty:-Math.round(mw), side:'SELL'});   // SELL → negative
+  }
+  return out;
+}
+
+function xchCtx(){
+  const a=curAsset();
+  const d=istNow(); d.setDate(d.getDate()+1);          // delivery day is D+1
+  const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+
+            String(d.getDate()).padStart(2,'0');
+  return {pf:a.pf, date:iso, rev:0, asset:a, portLabel:a.id};
+}
+
+/* ── build + validate: the one place a payload comes into existence ────── */
+function xchBuild(){
+  const ex=$('xcEx').value, seg=$('xcSeg').value, kind=$('xcKind').value;
+  const ctx=xchCtx(), rows=xchRows();
+  /* Gate minutes come from the SHARED gate service, never inlined here. */
+  const now=(()=>{const t=istNow(); return t.getHours()*60+t.getMinutes();})();
+  const gate = seg==='RTM'
+    ? (()=>{const sN=nextBiddableSession(now); return sN===null?-1:minsToGate(sN,now);})()
+    : (DAM_GATE+1440)-now;
+  const ocfOn = !!($('xcOcf')&&$('xcOcf').checked);
+  const ocf   = ocfTarget(seg,ctx.asset);
+  const v=validateBid(ex,seg,kind,rows,ctx.asset,{gateMin:gate, ocf:ocfOn});
+  const file=v.spec ? bidCsv(ex,seg,kind,rows,ctx) : null;
+  XDRAFT={ex,seg,kind,ctx,rows,file,val:v,gate,ocfOn,ocf,
+    hash:file?payloadHash(file.text):null,
+    state:v.ok?XST.VALID:XST.DRAFT, maker:XME.maker};
+  if(XDRAFT.hash)
+    XDRAFT.idem=[ex,seg,ctx.pf,ctx.date,'R'+ctx.rev,ocfOn?'OCF':'NOCF',XDRAFT.hash].join('|');
+  return XDRAFT;
+}
+
+function xchRender(){
+  xchInit();
+  const d=xchBuild(), ex=XCH[d.ex], sp=d.val.spec;
+
+  $('xcMeta').innerHTML='<div class="xc-g">'+
+    xkv('Member','<span class="mono">'+ex.member+'</span>')+
+    xkv('Portfolio','<span class="mono">'+ex.portfolio+'</span>')+
+    xkv('Segments',ex.segs.join(' · '))+
+    xkv('Transport',ex.api.mode)+
+    xkv('Auth',ex.api.auth)+
+    xkv('Endpoint','<span class="mono">'+ex.api.base+ex.api.submit+'</span>')+
+    xkv('API status', ex.api.live?'<span class="pill p-ok">enabled</span>'
+       :'<span class="pill p-wrn">onboarding — file only</span>')+
+    xkv('Layout', sp?'<span class="mono">'+sp.id+'</span> '+(sp.confirmed
+        ?'<span class="pill p-ok">from template</span>'
+        :'<span class="pill p-bad">unconfirmed</span>'):'—')+
+    xkv('Source', sp?'<span class="mut">'+sp.source+'</span>':'—')+
+    '</div>';
+
+  /* OCF panel — the control, and the reason when it cannot be used */
+  const oc=$('xcOcf'); if(oc) oc.disabled=!d.ocf.ok;
+  if(oc&&!d.ocf.ok) oc.checked=false;
+  $('xcOcfNote').innerHTML = d.ocf.ok
+    ? '<span class="pos">'+d.ocf.reason+'</span>'+(d.ocfOn
+        ? ' — unmatched volume is offered to <b>'+d.ocf.target+'</b>.'
+        : ' — currently off, unmatched volume simply lapses.')
+    : '<span class="mut">Unavailable: '+d.ocf.reason+'.</span>';
+
+  let vh='';
+  if(d.val.errs.length) vh+='<div class="xc-err"><b>'+d.val.errs.length+
+    ' error'+(d.val.errs.length>1?'s':'')+' — nothing can be emitted or sent</b><ul>'+
+    d.val.errs.slice(0,8).map(e=>'<li>'+e+'</li>').join('')+'</ul></div>';
+  if(d.val.warns.length) vh+='<div class="xc-warn"><b>'+d.val.warns.length+
+    ' warning'+(d.val.warns.length>1?'s':'')+'</b><ul>'+
+    d.val.warns.map(e=>'<li>'+e+'</li>').join('')+'</ul></div>';
+  if(!vh) vh='<div class="xc-ok">Validated — '+d.rows.length+' blocks within the '+
+    d.seg+' cap of ₹'+inr(SEG[d.seg].cap,0)+', all sell quantities negative.</div>';
+  $('xcVal').innerHTML=vh;
+
+  const mwh=d.rows.reduce((s,r)=>s+Math.abs(r.qty)*H,0);
+  $('xcId').innerHTML='<div class="xc-g">'+
+    xkv('Delivery day',d.ctx.date)+
+    xkv('Blocks bid',d.rows.length+' of 96')+
+    xkv('MWh offered',inr(mwh,2))+
+    xkv('Side','SELL · negative quantity')+
+    xkv('Revision','R'+d.ctx.rev)+
+    xkv('OCF', d.ocfOn?('<span class="pill p-vio">'+d.seg+' → '+d.ocf.target+'</span>')
+        :'<span class="pill p-mut">off</span>')+
+    xkv('Gate',d.gate>0?dur(d.gate)+' remaining':'<span class="neg">closed</span>')+
+    xkv('Payload SHA','<span class="mono">'+(d.hash||'—')+'</span>')+
+    xkv('Idempotency key','<span class="mono xc-key">'+(d.idem||'—')+'</span>')+
+    '</div>';
+
+  /* PREVIEW. A 194-column matrix cannot be shown as a table, and a decoded
+     table alone hides the shape the exchange actually receives — so both: the
+     per-block step the desk reasons about, and the literal opening lines of
+     the file, truncated with their true column count. */
+  if(d.file){
+    const lines=d.file.text.split(sp.eol);
+    let raw='<div class="xc-raw">';
+    lines.slice(0,4).forEach((ln,i)=>{
+      const n=ln.split(',').length;
+      raw+='<div><span class="rn">'+(i+1)+'</span><span class="rc">'+n+' cols</span>'+
+        (ln.length>150?ln.slice(0,150)+'<span class="mut"> …</span>':ln)+'</div>';});
+    raw+='<div class="mut" style="padding:4px 0 0 46px">'+lines.length+
+      ' lines total'+(d.file.axis?' · '+d.file.axis+' price points on the axis':'')+'</div></div>';
+    let t='<table><thead><tr><th>Block</th><th>From</th><th>To</th>'+
+      '<th>Side</th><th class="n">Step price ₹/MWh</th><th class="n">Quantum MW</th>'+
+      '</tr></thead><tbody>';
+    d.rows.slice(0,40).forEach(r=>{
+      t+='<tr><td class="mono">'+(r.b+1)+'</td><td class="mono">'+blkTime(r.b)+
+        '</td><td class="mono">'+(r.b+1===NB?'00:00':blkTime(r.b+1))+
+        '</td><td class="mono">'+r.side+'</td>'+
+        '<td class="n mono">'+inr(Math.round(r.price),0)+'</td>'+
+        '<td class="n mono neg">'+inr(Math.round(r.qty),0)+'</td></tr>';});
+    $('xcRaw').innerHTML=raw;
+    $('xcPrev').innerHTML=t+'</tbody></table>';
+    $('xcFile').textContent=d.file.name;
+  } else { $('xcRaw').innerHTML=''; $('xcPrev').innerHTML=
+    '<div class="fg-empty">No layout for this exchange.</div>'; $('xcFile').textContent='—'; }
+
+  const canFile=d.val.ok, canSend=d.val.ok&&ex.api.live&&d.gate>0;
+  $('xcDl').disabled=!canFile; $('xcSend').disabled=!canSend;
+  $('xcSend').title = !ex.api.live?ex.name+' API onboarding is not complete'
+    : d.gate<=0?'Gate closed' : !d.val.ok?'Fix the errors first':'';
+  $('xcNote').textContent = canSend?'Both paths carry payload '+d.hash+'.'
+    : canFile?'File path available; API path is not.':'Blocked by validation.';
+  xchLog();
+}
+const xkv=(k,v)=>'<div class="xc-kv"><span class="xk">'+k+'</span><span class="xv">'+v+'</span></div>';
+
+/* ── file download ────────────────────────────────────────────────────────
+   The file is generated from the SAME validated payload as the API body and
+   its hash is recorded in the log, so a member who uploads by hand still has
+   the provenance trail an API submission would have produced. */
+function xchDownload(){
+  const d=XDRAFT; if(!d||!d.val.ok||!d.file) return;
+  const blob=new Blob([d.file.text],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=d.file.name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  XSUBS.unshift({t:istNow(),ex:d.ex,seg:d.seg,kind:d.kind,rows:d.rows.length,
+    hash:d.hash,idem:d.idem,state:'FILE_DOWNLOADED',by:XME.maker,
+    msg:d.file.name+' — manual upload path'});
+  EVENTS.unshift({t:blkTime(LB),kind:'BID_FILE',
+    msg:d.ex+' '+d.seg+' '+d.file.name+' downloaded · payload '+d.hash,who:XME.maker});
+  toast('Downloaded '+d.file.name+' — payload '+d.hash+' logged.');
+  xchLog();
+}
+
+/* ── API submission ──────────────────────────────────────────────────────── */
+function xchSubmit(){
+  const d=XDRAFT; if(!d) return;
+  if(!d.val.ok){ toast('Validation failed — nothing sent.',true); return; }
+  if(!XCH[d.ex].api.live){ toast(d.ex+' API is not enabled for this member.',true); return; }
+  if(d.gate<=0){ toast('Gate has closed — submission refused.',true); return; }
+
+  /* IDEMPOTENCY, checked before anything else. An identical payload already
+     accepted is not re-sent; the original acknowledgement is returned. */
+  const prev=XKEYS[d.idem];
+  if(prev){
+    XSUBS.unshift({t:istNow(),ex:d.ex,seg:d.seg,kind:d.kind,rows:d.rows.length,
+      hash:d.hash,idem:d.idem,state:XST.DUP,by:XME.maker,
+      msg:'Identical payload already accepted as '+prev.exref+' — nothing sent.'});
+    toast('Duplicate suppressed — '+prev.exref+' already holds this payload.');
+    xchLog(); return;
+  }
+  /* MAKER-CHECKER on identity. The account that built the payload cannot be the
+     account that releases it; in production the token carries this, not the UI. */
+  if(!d.approvedBy){
+    d.state=XST.PEND;
+    XSUBS.unshift({t:istNow(),ex:d.ex,seg:d.seg,kind:d.kind,rows:d.rows.length,
+      hash:d.hash,idem:d.idem,state:XST.PEND,by:XME.maker,
+      msg:'Awaiting checker — maker '+XME.maker+' cannot release own payload.'});
+    toast('Queued for checker. '+XME.checker+' must release it.');
+    xchLog(); return;
+  }
+  const rec={t:istNow(),ex:d.ex,seg:d.seg,kind:d.kind,rows:d.rows.length,
+    hash:d.hash,idem:d.idem,state:XST.SENDING,by:d.approvedBy,
+    msg:'POST '+XCH[d.ex].api.base+XCH[d.ex].api.submit};
+  XSUBS.unshift(rec); xchLog();
+
+  /* SIMULATED transport. A deterministic slice of payloads is rejected, so the
+     rejection path is demonstrable rather than theoretical. */
+  setTimeout(()=>{
+    const reject = (parseInt(d.hash,16)%7)===0;
+    if(reject){
+      rec.state=XST.NACK;
+      rec.msg='HTTP 422 · '+d.ex+' rejected: block 47 quantum 0.00 MW after rounding '+
+              '— row rejected, whole file not accepted. Nothing is on the exchange.';
+      toast(d.ex+' rejected the file — see the log. Nothing was accepted.',true);
+    } else {
+      rec.state=XST.ACK; rec.exref=d.ex+'-'+String(700000+
+        (parseInt(d.hash,16)%99999)).slice(0,6);
+      rec.msg='HTTP 201 · accepted as '+rec.exref+' · '+d.rows.length+' rows · '+
+              'ack in 380 ms';
+      XKEYS[d.idem]=rec;
+      toast('Accepted by '+d.ex+' as '+rec.exref+'.');
+    }
+    EVENTS.unshift({t:blkTime(LB),kind:'BID_SUBMIT',
+      msg:d.ex+' '+d.seg+' '+rec.state+(rec.exref?' '+rec.exref:'')+' · payload '+d.hash,
+      who:d.approvedBy});
+    xchLog();
+  },520);
+}
+
+function xchApprove(){
+  const d=XDRAFT; if(!d||!d.val.ok) return;
+  d.approvedBy=XME.checker; d.state=XST.APPR;
+  XSUBS.unshift({t:istNow(),ex:d.ex,seg:d.seg,kind:d.kind,rows:d.rows.length,
+    hash:d.hash,idem:d.idem,state:XST.APPR,by:XME.checker,
+    msg:'Released by checker — payload '+d.hash+' locked for submission.'});
+  toast('Released by '+XME.checker+'. Submit is now armed.');
+  xchLog();
+}
+
+/* A failed submission is NEVER retried automatically. The button exists so the
+   retry is a decision with a name against it — an automatic retry against a
+   request that succeeded but timed out on the way back is how a bid doubles. */
+function xchRetry(i){
+  const r=XSUBS[i]; if(!r||r.state!==XST.NACK) return;
+  toast('Rebuild the payload and resubmit — a rejected file is not resent as-is.');
+  xchRender();
+}
+
+function xchLog(){
+  const h=$('xcLog'); if(!h) return;
+  if(!XSUBS.length){ h.innerHTML='<div class="fg-empty">No submission attempts yet.</div>'; return; }
+  let t='<table><thead><tr><th>Time</th><th>Exchange</th><th>Segment</th>'+
+    '<th>Type</th><th class="n">Rows</th><th>Payload</th><th>State</th>'+
+    '<th>Detail</th><th>By</th></tr></thead><tbody>';
+  XSUBS.slice(0,14).forEach((r,i)=>{
+    t+='<tr><td class="mono">'+r.t.toTimeString().slice(0,8)+'</td>'+
+      '<td class="mono">'+r.ex+'</td><td class="mono">'+r.seg+'</td>'+
+      '<td class="mono">'+r.kind+'</td><td class="n mono">'+r.rows+'</td>'+
+      '<td class="mono">'+r.hash+'</td>'+
+      '<td><span class="pill '+(XST_PILL[r.state]||'p-mut')+'">'+r.state+'</span></td>'+
+      '<td>'+r.msg+(r.state===XST.NACK?' <button class="btn sm" onclick="xchRetry('+i+
+        ')">Rebuild</button>':'')+'</td>'+
+      '<td class="mut">'+r.by+'</td></tr>';});
+  h.innerHTML=t+'</tbody></table>';
+}
 </script>
 <script>
 /* ═══════════════ M2 SCHEDULING ════════════════════════════════════════ */
@@ -4138,10 +4784,92 @@ function runSelfCheck(){
   const smp=raw(123456.789,2);
   ok(!/,/.test(smp),'numbers written to a file carry no locale separator','raw(123456.789) = '+smp);
 
+  out.push('<div style="margin:9px 0 7px" class="note"><b>Exchange submission</b></div>');
+  {
+    const big=AS.slice().sort((x,y)=>y.ac-x.ac)[0], o=ACT[big.id];
+    const mkRows=(seg)=>{const r=[];
+      for(let b=0;b<NB;b++){
+        const mw=Math.max(0,fin(b<LB?o.metered[b]:o.avail[b],0)-fin(o.captive[b],0));
+        if(mw<BIDP.sco) continue;
+        r.push({b, price:clamp(0,SEG[seg].cap,
+          Math.round(fin(P.DAM[b],0)/BIDP.pstep)*BIDP.pstep),
+          qty:-Math.round(mw), side:'SELL'});}
+      return r;};
+    const ctx={pf:big.pf,date:'2026-09-10',rev:0,portLabel:big.id};
+    let emitted=0, bad=[];
+    Object.keys(XCH).forEach(ex=>xchKinds(ex).forEach(kind=>{
+      const seg=XCH[ex].segs[0], rows=mkRows(seg);
+      const f=bidCsv(ex,seg,kind,rows,ctx); if(!f) return; emitted++;
+      const lines=f.text.split(xchSpec(ex,kind).eol).filter(Boolean);
+      if(XCH[ex].emit==='iex-sb'){
+        /* the matrix must be rectangular and 96 blocks deep, or the exchange
+           reads a quantity against the wrong price */
+        const w=new Set(lines.slice(2).map(l=>l.split(',').length));
+        if(w.size!==1) bad.push(ex+' matrix is ragged: widths '+[...w].join('/'));
+        if(lines.length!==99) bad.push(ex+' has '+lines.length+' lines, expected 99');
+      } else {
+        const w=new Set(lines.map(l=>l.split(',').length));
+        if(w.size!==1||![...w][0]||[...w][0]!==11)
+          bad.push(ex+' row file width '+[...w].join('/')+', expected 11');
+      }
+    }));
+    ok(emitted>=3,'a bid file is emitted for every exchange layout',
+      emitted+' layouts across '+Object.keys(XCH).length+' exchanges');
+    ok(!bad.length,'every emitted file is structurally well-formed',
+      bad.length?bad.join(' · '):'IEX matrix rectangular at 99 lines; PXIL rows 11 columns');
+
+    /* SIGN — the most expensive formatting error available */
+    const rr=mkRows('DAM');
+    const iex=bidCsv('IEX','DAM','sb',rr,ctx);
+    const ax=iex.text.split('\n')[2].split(',').slice(4).map(Number);
+    const r0=iex.text.split('\n')[3+rr[0].b].split(',').slice(4).map(Number);
+    ok(r0.every(v=>v<=0),'a SELL is written as a negative quantity',
+      'both templates use this convention; a positive quantity is the other side of the market');
+    ok(ax[0]===0&&ax[ax.length-1]===SEG.DAM.cap,
+      'the price axis spans 0 to the segment cap','0 … '+inr(ax[ax.length-1],0));
+    ok(ax.every((v,i)=>i===0||v>=ax[i-1]),'the price axis is non-decreasing',
+      ax.length+' points');
+    /* the step must switch at the reserve price and nowhere else */
+    const t=Math.round(rr[0].price);
+    const below=ax.filter(p=>p<t).map(p=>r0[ax.indexOf(p)]);
+    const at   =ax.filter(p=>p>=t).map(p=>r0[ax.indexOf(p)]);
+    ok(below.every(v=>v===0)&&at.every(v=>v===rr[0].qty),
+      'a sell offers nothing below its reserve and its full volume at or above it',
+      'step at ₹'+inr(t,0)+' → '+rr[0].qty+' MW');
+    const badSign=validateBid('IEX','DAM','sb',
+      [{b:0,price:3000,qty:+5,side:'SELL'}],big,{gateMin:60});
+    ok(!badSign.ok,'a positive quantity on a SELL is refused','sign is validated, not assumed');
+
+    /* OCF cascade */
+    ok(ocfTarget('GDAM',big).ok&&ocfTarget('GDAM',big).target==='DAM',
+      'OCF carries GDAM → DAM','the one hop available to this portfolio');
+    ok(!ocfTarget('DAM',big).ok,'OCF from DAM is refused for an RE seller',
+      ocfTarget('DAM',big).reason);
+    ok(!ocfTarget('RTM',big).ok,'there is no DAM → RTM carry-forward',
+      'the cascade is GDAM → DAM → HPDAM only');
+    ok(!validateBid('IEX','RTM','sb',rr,big,{gateMin:60,ocf:true}).ok,
+      'requesting OCF on a segment that has none blocks the bid','refused, not silently ignored');
+
+    /* PXIL date and hour-24 convention */
+    const px=bidCsv('PXIL','DAM','single',mkRows('DAM'),ctx);
+    ok(/,\d\d-[A-Z][a-z]{2}-\d{4},/.test(px.text),'PXIL dates are written DD-Mmm-YYYY',
+      pxilDate(ctx.date));
+    const last=mkRows('DAM').filter(r=>r.b===NB-1);
+    if(last.length){
+      const lp=bidCsv('PXIL','DAM','single',last,ctx).text.split('\n')[1].split(',');
+      ok(lp[5]==='24'&&lp[6]==='00','the last PXIL block closes at hour 24, not 00:00',
+        'rolling to 00:00 would move the block to the wrong delivery day');
+    }
+    const unconf=Object.keys(XCH).flatMap(ex=>xchKinds(ex).map(k=>xchSpec(ex,k)))
+      .filter(sp=>sp&&!sp.confirmed);
+    ok(unconf.length>0,'a layout with no supplied template stays flagged',
+      unconf.map(u=>u.id).join(', ')+' — '+unconf[0].source);
+  }
   out.push('<div style="margin:11px 0 4px" class="note"><span class="mut">A reconciling waterfall is an '+
     'algebraic identity — it closes for any input, including one missing the whole buy book. Not assurance.</span></div>');
   $('runlog').innerHTML=out.join('');
 }
+const seg0=ex=>(XCH[ex]&&XCH[ex].segs[0])||'DAM';
 function showRunlog(){go('x');goSub('x','runlog');}
 
 /* ═══════════════ EXPORT — pure-JS multi-sheet XLSX ════════════════════ */

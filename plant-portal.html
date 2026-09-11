@@ -816,7 +816,7 @@ function buildAssets(){
     a.hpdam= false;                                    // RE seller — ineligible
     a.rec  = (a.offtake==='Merchant'||a.offtake==='OpenAccess');
     a.exch = a.ac>=60?['IEX','PXIL','HPX']:a.ac>=25?['IEX','PXIL']:['IEX'];
-    a.pf   = 'AMP'+String(1000+A.indexOf(a)).slice(1);
+    a.pf   = 'AMP'+String(1001+A.indexOf(a)).slice(1);   // 1-based: AMP001, not AMP000
     a.cuf  = a.tech==='Wind'?0.29:a.tech==='Hybrid'?0.33:a.tech==='Floating'?0.21:0.215;
     a.cod  = 2019+Math.floor(R.gen()*7);
   });
@@ -863,6 +863,201 @@ AS.forEach(a=>{
 });
 /* CR for one plant in one block. PPA plants ignore the block entirely. */
 const crOf=(a,b)=> a.cr===CR_MARKET ? clamp(0,SEG.DAM.cap,fin(P.ACP[b],0)) : a.cr;
+
+/* ═══ 2b · EXCHANGE & BID-FILE FORMAT REGISTRY ═══════════════════════════
+   Three exchanges, each with its own member ID, segment coverage, API status
+   and file layout. The registry is DATA, so adding an exchange or a segment is
+   a configuration change and not a code change — which is the whole point,
+   because these formats change without notice and a hardcoded column list is a
+   silent breakage on the morning it changes.
+
+   ⚠ THE COLUMN LAYOUTS BELOW ARE PLACEHOLDERS, MARKED `confirmed:false`.
+   The authoritative layout for each exchange and segment is the file spec
+   published on that exchange's member portal, and `popt-bidding` is explicit
+   that matching it exactly is a hard constraint. Nothing here should be used to
+   generate a real bid until each spec has been checked against the current
+   published version and its `confirmed` flag set with the version and date.
+   The UI shows the flag on screen so an unconfirmed spec cannot be mistaken
+   for a verified one. Caps and eligibility, by contrast, come from `bidiq`
+   and the SEG table above, which ARE authoritative here.               */
+const XCH = {
+  IEX: { name:'Indian Energy Exchange', member:'AMPIN/IEX/M-04173',
+         segs:['DAM','GDAM','RTM','TAM','GTAM'],
+         api:{ mode:'REST/JSON', auth:'mTLS client cert + HMAC-SHA256 request signing',
+               base:'https://api.iexindia.com/v2', submit:'/bids', ack:'/bids/{id}/status',
+               idem:'X-Idempotency-Key', live:true },
+         fileKind:'csv', dec:2 },
+  PXIL:{ name:'Power Exchange India', member:'AMPIN-PXIL-2291',
+         segs:['DAM','GDAM','RTM','TAM'],
+         api:{ mode:'SFTP drop + polled ack', auth:'SSH key + PGP payload',
+               base:'sftp://sftp.pxil.in/in', submit:'/bids/{date}', ack:'/ack/{date}',
+               idem:'filename sequence', live:true },
+         fileKind:'csv', dec:2 },
+  HPX: { name:'Hindustan Power Exchange', member:'HPX-AMPIN-0864',
+         segs:['DAM','GDAM','RTM'],
+         api:{ mode:'REST/JSON', auth:'OAuth2 client credentials + IP allow-list',
+               base:'https://api.hpx.co.in/v1', submit:'/order/bulk', ack:'/order/{id}',
+               idem:'clientOrderId', live:false },   // onboarding not complete
+         fileKind:'csv', dec:2 }
+};
+
+/* Column layouts per exchange and bid type. `u` is the unit shown in the header
+   row where the exchange expects one; `dp` fixes the decimal places, because a
+   file that carries three decimals where the spec allows two is rejected at
+   upload and there is no time to find out why before the gate. */
+const XCOL = {
+  IEX:{
+    single:{ id:'IEX-SB', label:'Single (block-wise) bid', ext:'csv',
+      file:'IEX_{SEG}_{PF}_{DATE}_R{REV}.csv', confirmed:false,
+      cols:[ {k:'sn',      h:'S.No',            dp:0},
+             {k:'pf',      h:'Portfolio'},
+             {k:'blk',     h:'Block',           dp:0},
+             {k:'t0',      h:'From'},
+             {k:'t1',      h:'To'},
+             {k:'side',    h:'Bid Type'},
+             {k:'price',   h:'Price (Rs/MWh)',  dp:2},
+             {k:'qty',     h:'Quantum (MW)',    dp:2} ] },
+    block:{ id:'IEX-BB', label:'Block bid — all-or-nothing', ext:'csv',
+      file:'IEX_{SEG}_BB_{PF}_{DATE}_R{REV}.csv', confirmed:false,
+      cols:[ {k:'sn',      h:'S.No',            dp:0},
+             {k:'pf',      h:'Portfolio'},
+             {k:'bid',     h:'Block Bid ID'},
+             {k:'b0',      h:'Start Block',     dp:0},
+             {k:'b1',      h:'End Block',       dp:0},
+             {k:'side',    h:'Bid Type'},
+             {k:'price',   h:'Price (Rs/MWh)',  dp:2},
+             {k:'qty',     h:'Quantum (MW)',    dp:2},
+             {k:'aon',     h:'All Or None'} ] }
+  },
+  PXIL:{
+    single:{ id:'PXIL-DBF', label:'Daily bid file', ext:'csv',
+      file:'PXIL_{SEG}_{MEMBER}_{DATE}_{REV}.csv', confirmed:false,
+      cols:[ {k:'member',  h:'MemberCode'},
+             {k:'pf',      h:'PortfolioCode'},
+             {k:'date',    h:'DeliveryDate'},
+             {k:'blk',     h:'TimeBlock',       dp:0},
+             {k:'side',    h:'BuySell'},
+             {k:'qty',     h:'Qty_MW',          dp:2},
+             {k:'price',   h:'Price_RsPerMWh',  dp:2} ] },
+    block:{ id:'PXIL-BLK', label:'Block bid file', ext:'csv',
+      file:'PXIL_{SEG}_BLK_{MEMBER}_{DATE}_{REV}.csv', confirmed:false,
+      cols:[ {k:'member',  h:'MemberCode'},
+             {k:'pf',      h:'PortfolioCode'},
+             {k:'date',    h:'DeliveryDate'},
+             {k:'bid',     h:'BlockRef'},
+             {k:'b0',      h:'FromBlock',       dp:0},
+             {k:'b1',      h:'ToBlock',         dp:0},
+             {k:'side',    h:'BuySell'},
+             {k:'qty',     h:'Qty_MW',          dp:2},
+             {k:'price',   h:'Price_RsPerMWh',  dp:2} ] }
+  },
+  HPX:{
+    single:{ id:'HPX-OB', label:'Order book upload', ext:'csv',
+      file:'HPX_{SEG}_{MEMBER}_{DATE}_rev{REV}.csv', confirmed:false,
+      cols:[ {k:'member',  h:'ParticipantID'},
+             {k:'pf',      h:'PortfolioID'},
+             {k:'date',    h:'TradeDate'},
+             {k:'blk',     h:'SlotNo',          dp:0},
+             {k:'side',    h:'Direction'},
+             {k:'price',   h:'LimitPrice',      dp:2},
+             {k:'qty',     h:'Volume',          dp:2} ] },
+    block:{ id:'HPX-BLK', label:'Block order upload', ext:'csv',
+      file:'HPX_{SEG}_BLK_{MEMBER}_{DATE}_rev{REV}.csv', confirmed:false,
+      cols:[ {k:'member',  h:'ParticipantID'},
+             {k:'pf',      h:'PortfolioID'},
+             {k:'date',    h:'TradeDate'},
+             {k:'bid',     h:'OrderRef'},
+             {k:'b0',      h:'FromSlot',        dp:0},
+             {k:'b1',      h:'ToSlot',          dp:0},
+             {k:'side',    h:'Direction'},
+             {k:'price',   h:'LimitPrice',      dp:2},
+             {k:'qty',     h:'Volume',          dp:2},
+             {k:'aon',     h:'AllOrNone'} ] }
+  }
+};
+const xchSpec=(ex,kind)=> (XCOL[ex]&&XCOL[ex][kind]) || null;
+
+/* Bid parameters, named as `popt-bidding` names them, so the two vocabularies
+   do not drift: sco = sell cutoff MW below which no bid is placed, pstep = the
+   price-ladder step in ₹/MWh. */
+const BIDP = { sco:0.50, bco:0.50, pstep:50, minPrice:0 };
+
+/* ── validation ───────────────────────────────────────────────────────────
+   Runs BEFORE anything is emitted or submitted, and the same function guards
+   both paths — a file and an API call must never be able to disagree about
+   whether a bid was legal. Returns errors (block emission) and warnings
+   (allow, but say so). */
+function validateBid(ex,seg,kind,rows,asset,opt){
+  opt=opt||{};
+  const errs=[], warns=[], spec=xchSpec(ex,kind);
+  if(!XCH[ex])                    errs.push('Unknown exchange "'+ex+'".');
+  if(!spec)                       errs.push('No '+kind+' file spec for '+ex+'.');
+  if(XCH[ex]&&!XCH[ex].segs.includes(seg))
+    errs.push(seg+' is not offered by '+ex+' — member is enabled for '+XCH[ex].segs.join(', ')+'.');
+  if(!SEG[seg])                   errs.push('Unknown segment "'+seg+'".');
+  /* eligibility is an ASSET-LOAD property (bidiq): an RE seller can never bid
+     HPDAM, so this is a registry fact and not a per-bid judgement call. */
+  if(SEG[seg]&&SEG[seg].re===false&&asset)
+    errs.push(asset.id+' is an RE seller — not eligible for '+seg+' (validated at asset load).');
+  if(!rows.length)                errs.push('Nothing to bid — every block is below the '+
+                                    BIDP.sco+' MW sell cutoff.');
+  const cap=SEG[seg]?SEG[seg].cap:0;
+  rows.forEach(r=>{
+    if(!Number.isFinite(r.price)||!Number.isFinite(r.qty))
+      errs.push('Block '+(r.blk||r.b0)+': price or quantity is not a number.');
+    else{
+      if(r.price>cap)  errs.push('Block '+(r.blk||r.b0)+': ₹'+inr(r.price,2)+
+                        ' exceeds the '+seg+' cap of ₹'+inr(cap,0)+'.');
+      if(r.price<BIDP.minPrice) errs.push('Block '+(r.blk||r.b0)+': negative price.');
+      if(r.qty<=0)     errs.push('Block '+(r.blk||r.b0)+': non-positive quantity.');
+      if(r.qty<BIDP.sco) warns.push('Block '+(r.blk||r.b0)+': '+inr(r.qty,2)+
+                        ' MW is under the cutoff and was expected to be filtered out.');
+    }
+  });
+  if(opt.gateMin!=null && opt.gateMin<=0)
+    errs.push('Gate for this segment has closed — submission window is shut.');
+  if(spec&&!spec.confirmed)
+    warns.push('File layout '+spec.id+' is UNCONFIRMED against '+ex+
+      "'s current published spec. Confirm before using this file for a real bid.");
+  if(XCH[ex]&&!XCH[ex].api.live)
+    warns.push(ex+' API onboarding is not complete — file download is the only path today.');
+  return {ok:!errs.length, errs, warns, spec};
+}
+
+/* ── CSV emitter ──────────────────────────────────────────────────────────
+   One emitter, driven entirely by the column list, so a spec change is a data
+   edit. Values are formatted with raw() and never toLocaleString — an Indian
+   grouping separator inside an unquoted CSV field shifts every later column,
+   which is the defect this file's header calls out. */
+function bidCsv(ex,seg,kind,rows,ctx){
+  const spec=xchSpec(ex,kind); if(!spec) return null;
+  const q=v=>{const s=String(v==null?'':v);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;};
+  const head=spec.cols.map(c=>q(c.h)).join(',');
+  const body=rows.map((r,i)=>spec.cols.map(c=>{
+    let v = c.k==='sn' ? i+1
+          : c.k==='member' ? XCH[ex].member
+          : c.k==='date'   ? ctx.date
+          : c.k==='pf'     ? ctx.pf
+          : c.k==='aon'    ? 'Y'
+          : r[c.k];
+    if(c.dp!=null && Number.isFinite(+v)) v=raw(+v,c.dp);
+    return q(v);
+  }).join(',')).join('\r\n');                 // CRLF — exchange uploads expect it
+  const name=spec.file.replace('{SEG}',seg).replace('{PF}',ctx.pf)
+    .replace('{MEMBER}',XCH[ex].member.replace(/[^A-Za-z0-9]/g,''))
+    .replace('{DATE}',ctx.date.replace(/-/g,'')).replace('{REV}',ctx.rev);
+  return {name, text:head+'\r\n'+body+'\r\n', rows:rows.length, spec};
+}
+
+/* Deterministic payload hash. What matters at 09:58 is not a pretty digest but
+   being able to prove the file on disk is byte-identical to what the API was
+   handed — one payload, two transports, one hash. FNV-1a is enough for that. */
+function payloadHash(s){
+  let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; }
+  return ('00000000'+h.toString(16)).slice(-8).toUpperCase();
+}
 
 /* ═══ 3 · GENERATION / ACTUALS PLANE ═════════════════════════════════════ */
 /* ONE shared actuals layer. Five screens read from it, so no two screens
@@ -1072,8 +1267,9 @@ AS.forEach(a=>{
   const o=ACT[a.id];
   const [v1,v2]=dsmLimits(DSM_DAY,a.tech);
   const X=dsmX(DSM_DAY,a.tech);
-  let pay=0,rec=0,dv=0,beyond=0;
-  const blk =new Array(NB).fill(null),   // signed ₹: +payable, −receivable
+  let pay=0,rec=0,dv=0,beyond=0,fgn=0;
+  const blk =new Array(NB).fill(null),   // signed ₹: +payable, −receivable (CASH)
+        cst =new Array(NB).fill(null),   // ₹ ≥ 0: economic cost of the deviation
         dvb =new Array(NB).fill(null),   // signed MW deviation
         pctb=new Array(NB).fill(null),   // DWS% for the block
         slb =new Array(NB).fill(null);   // deepest slab the deviation reached
@@ -1086,19 +1282,34 @@ AS.forEach(a=>{
     const cr  = crOf(a,b);
     const parts=dsmSlice(Math.abs(dMwh),[v1/100*den, v2/100*den, null]);
     const rates=(d<0?DSM_UNDER:DSM_OVER);
-    let amt=0, deepest=0;
-    parts.forEach((mwh,i)=>{ if(mwh>0){ amt+=mwh*rates[i]*cr; deepest=i; } });
+    let amt=0, cost=0, deepest=0;
+    parts.forEach((mwh,i)=>{ if(mwh>0){
+      amt+=mwh*rates[i]*cr; deepest=i;
+      /* ECONOMIC COST, which is not the same thing as the cash movement.
+         Under-injection: the cost IS the charge — energy was never generated,
+         so nothing was written off, and the bill is the whole loss.
+         Over-injection: the receivable is the ONLY payment this energy gets, so
+         the loss is the SHORTFALL against CR — nil inside VLwS(1) where it is
+         paid in full, 10% of CR inside VLwS(2), and 100% beyond it, where the
+         MWh is delivered and earns nothing at all.
+         So over-injection is never a gain: at best neutral, at worst a total
+         write-off. Netting the receivable against the payable answers "what
+         moved through the pool account", not "what did forecast error cost",
+         and only the second question tells a desk where to act. */
+      cost += d<0 ? mwh*rates[i]*cr : mwh*(1-rates[i])*cr;
+    }});
     /* payable is positive, receivable negative — the pool's sign convention,
        so a sum across plants or blocks is directly a cash figure. */
     const signed = d<0 ? amt : -amt;
-    if(d<0) pay+=amt; else rec+=amt;
+    if(d<0) pay+=amt; else { rec+=amt; fgn+=cost; }
     dv+=Math.abs(dMwh); beyond+=parts[2];
-    blk[b]=signed; dvb[b]=d; slb[b]=deepest;
+    blk[b]=signed; cst[b]=cost; dvb[b]=d; slb[b]=deepest;
     pctb[b]= den>0 ? dMwh/den*100 : null;
   }
   ADSM[a.id]={payable:pay, receivable:rec, net:pay-rec,
+              foregone:fgn, cost:pay+fgn,
               devMwh:dv, beyondMwh:beyond,
-              blk, dev:dvb, pct:pctb, slab:slb, v1, v2, X};
+              blk, cst, dev:dvb, pct:pctb, slab:slb, v1, v2, X};
 });
 /* Capacity-weighted CR for a block — the portfolio's blended base rate. Only
    the merchant and open-access plants move with the market, so this line is
@@ -1115,6 +1326,12 @@ const dsmReceivable =AS.reduce((s,a)=>s+ADSM[a.id].receivable,0);
 const dsmNet        =AS.reduce((s,a)=>s+ADSM[a.id].net,0);
 const devGross      =AS.reduce((s,a)=>s+ADSM[a.id].devMwh,0);
 const dsmBeyondMwh  =AS.reduce((s,a)=>s+ADSM[a.id].beyondMwh,0);
+/* The cost of forecast error, which is what a trade-ops platform exists to
+   reduce: the bill for being short, plus the value written off for being long
+   past the point where the pool still pays for it. Always ≥ 0. The foregone
+   limb is an economic reading, not a line in the regulation — say so. */
+const dsmForegone   =AS.reduce((s,a)=>s+ADSM[a.id].foregone,0);
+const dsmCost       =AS.reduce((s,a)=>s+ADSM[a.id].cost,0);
 /* `dsmGross` kept as the BILL — what the pool invoices, before any credit is
    applied. It is the headline operational number; net is the cash effect. */
 const dsmGross      = dsmPayable;
@@ -2285,8 +2502,8 @@ function renderScore(){
                     :'net payable · receivable '+rsL(ADSM[a.id].receivable,2),
     ADSM[a.id].net<=0?'grn':'red'],
    ['VLwS bands',ADSM[a.id].v1+'% / '+ADSM[a.id].v2+'%',
-    'Reg 8(4) volume limits for '+a.tech.toLowerCase()+' · DWS% on '+
-    (ADSM[a.id].X===null?'available capacity':'X='+ADSM[a.id].X+'% blend'),'blu'],
+    'Reg 8(4) · '+a.tech.toLowerCase()+' · X='+
+    (ADSM[a.id].X===null?'AvC':ADSM[a.id].X+'%'),'blu'],
    ['Submission compliance',s.compliance===null?'n/a':s.compliance+'%','last 30 days, on time by cutoff',
     s.compliance===null?'blu':s.compliance>=90?'grn':s.compliance>=75?'acc':'red']]);
 
